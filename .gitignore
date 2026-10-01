@@ -1,0 +1,10 @@
+# Development scratch: the no-hardware test helpers write here.
+.scratch/
+
+# Installed dependencies, if anyone runs pnpm/npm in the checkout.
+node_modules/
+
+# Logs and editor/OS noise.
+*.log
+Thumbs.db
+.DS_Store

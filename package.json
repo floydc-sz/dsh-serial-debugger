@@ -1,0 +1,72 @@
+{
+  "name": "dsh-serial-debugger",
+  "version": "1.0.0",
+  "description": "DeepSeek Harness 串口调试插件：串口参数设置、实时接收显示（文本/十六进制）、数据发送。Serial debugger plugin for DeepSeek Harness: port parameter setup, live receive display (text/hex) and data transmission.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/floydc-sz/dsh-serial-debugger.git"
+  },
+  "homepage": "https://github.com/floydc-sz/dsh-serial-debugger#readme",
+  "bugs": {
+    "url": "https://github.com/floydc-sz/dsh-serial-debugger/issues"
+  },
+  "author": "floydc-sz",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "engines": {
+      "dsh": "^0.2.0-rc.1"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
+    }
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "serial",
+    "serialport",
+    "uart",
+    "com-port",
+    "debugger",
+    "terminal"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "win32"
+  ]
+}

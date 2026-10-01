@@ -1,0 +1,6 @@
+# dsh-serial-debugger bundle patch: one host row over the Web or Desktop profile.
+# The row name resolves from the profile's own node_modules, where this package
+# is installed.
+- insert:
+    - id: serial-debugger
+      name: dsh-serial-debugger
