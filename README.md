@@ -44,17 +44,17 @@ A serial-port debugger plugin for DeepSeek Harness: port parameter setup, live r
 
 ## 界面位置
 
-插件的界面挂在 **Harness 主界面的右侧边栏**里，以原生标签页的形式存在：
+插件的界面只有一处：**Harness 主界面的右侧边栏**，以原生标签页的形式存在。
 
 1. 点标题栏的「打开侧边栏」打开右侧边栏；
 2. 右侧边栏的引导页（空状态）列出可打开的标签类型，其中一行是 **「串口调试」**；
 3. 点这一行，串口调试界面就在右栏内打开（标签上显示「串口调试」）。
 
-实现上不是往某个 slot 塞一个按钮，而是注册一个**原生标签类型**：通过 `ctx.inject(['sidebarRightTabs'])` 拿到标签类型注册表，用 `register({ id, kind, title, guide })` 声明类型，`guide` 里的条目就是引导页上那一行；再按同一个 id 注册 `sidebar.right.pane.tab`（标签内容，渲染调试面板）与 `sidebar.right.pane.tab.title`（标签标题）。
+注册的 slot 只有两个：`sidebar.right.pane.tab`（标签内容，渲染调试面板）与 `sidebar.right.pane.tab.title`（标签标题）。没有左侧栏入口，也没有设置页——同一件仪器放两处只会让人猜哪个才是真的。
+
+实现上不是往某个 slot 塞一个按钮，而是注册一个**原生标签类型**：通过 `ctx.inject(['sidebarRightTabs'])` 拿到标签类型注册表，用 `register({ id, kind, title, guide })` 声明类型，`guide` 里的条目就是引导页上那一行；再按同一个 id 注册上面那两个 slot。
 
 > **顺序陷阱**：原生座位会先声明 `sidebar.right.pane.tab` 槽、之后才提供 `sidebarRightTabs` 服务。因此若用 `ctx.slots.inject('sidebar.right.pane.tab', ...)` 触发注册，回调里读到的服务是 `undefined`，而且该声明永不塌缩 —— 结果是**永远静默地什么都不注册**。必须等**服务**（`ctx.inject(['sidebarRightTabs'], ...)`），这也是服务出现/被替换时会自动重跑的生命周期。
-
-另外保留一个**设置页**（设置 → 串口调试）作为备用入口：它不依赖标签类型注册表，因此在没有提供 `sidebarRightTabs` 的部署里功能依然可达。
 
 ---
 

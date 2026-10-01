@@ -61,7 +61,7 @@ check('factory is a function', registration && typeof registration.factory === '
 const exports_ = registration.factory(requireStub)
 check('exports apply()', typeof exports_.apply === 'function')
 check('exports inject as a string array', Array.isArray(exports_.inject) && exports_.inject.includes('slots'), JSON.stringify(exports_.inject))
-check('panel id is stable', exports_.PANEL_ID === 'serial-debugger', exports_.PANEL_ID)
+check('tab kind is stable', exports_.TAB_KIND === 'serial-debugger', exports_.TAB_KIND)
 
 // ── manifest contract for a UI plugin ──────────────────────────────────────
 // The official decoration template requires platform + immediately + inject.
@@ -168,13 +168,10 @@ const chip = registeredSlots.find((r) => r.options.name === 'sidebar.right.pane.
 check('body and title are keyed by the tab type id', body !== undefined && body.options.key === type.id && chip !== undefined && chip.options.key === type.id, JSON.stringify([body && body.options.key, chip && chip.options.key]))
 check('body renders the debugger page', body !== undefined && body.Component === exports_.SerialDebuggerPage)
 check('title renders the plugin label', chip !== undefined && JSON.stringify(chip.Component({})).includes('串口调试'))
-check('no left-sidebar panel surfaces remain', !injectedSlots.includes('sidebar.panellist') && !injectedSlots.includes('sidebar.footer.action') && !injectedSlots.includes('main'), JSON.stringify(injectedSlots))
-
-// The Settings page is registered one macrotask later (past the activation cascade).
-await new Promise((resolve) => setTimeout(resolve, 5))
-const settingsSection = registeredSlots.find((r) => r.options.name === 'settings.section')
-check('settings page is registered', settingsSection !== undefined && settingsSection.options.id === 'serial-debugger' && typeof settingsSection.options.label === 'string', JSON.stringify(settingsSection && settingsSection.options))
-check('settings page renders the debugger page', settingsSection !== undefined && settingsSection.Component === exports_.SerialDebuggerPage)
+// The right-sidebar tab is the plugin's ONLY surface: no left-sidebar panel row,
+// no footer control, and no Settings page duplicating the same instrument.
+check('registers no left-sidebar or settings surface', !injectedSlots.includes('sidebar.panellist') && !injectedSlots.includes('sidebar.footer.action') && !injectedSlots.includes('main') && !injectedSlots.includes('settings.section'), JSON.stringify(injectedSlots))
+check('registers exactly the two pane slots', injectedSlots.length === 2, JSON.stringify(injectedSlots))
 
 // A deployment without the service must register nothing and must not throw.
 definedTypes.length = 0
@@ -184,21 +181,9 @@ exports_.apply(bare)
 check('a missing sidebarRightTabs service is survived', definedTypes.length === 0, `types=${definedTypes.length}`)
 check('the seat disposer is retained for teardown', seatDisposers.length > 0, `disposers=${seatDisposers.length}`)
 
-// A disposer must cancel the deferred Settings registration before it lands.
-const pending = []
-const pendingRegistered = []
-const cancelCtx = {
-	inject() { return { dispose: () => {} } },
-	effect(fn) { fn() },
-	slots: {
-		inject(name, callback) { pending.push(callback()) },
-		register(options) { pendingRegistered.push(options); return () => {} },
-	},
-}
-exports_.apply(cancelCtx)
-for (const dispose of pending) dispose()
+// A deployment whose service never appears still registers no slot entries.
 await new Promise((resolve) => setTimeout(resolve, 5))
-check('a disposer cancels a deferred registration', pendingRegistered.length === 0, `registered=${pendingRegistered.length}`)
+check('a missing service registers no slot entries', registeredSlots.length === 0, `slots=${registeredSlots.length}`)
 
 // ── pure encoder ───────────────────────────────────────────────────────────
 const enc = exports_.encodeSend
