@@ -63,6 +63,28 @@ check('exports apply()', typeof exports_.apply === 'function')
 check('exports inject as a string array', Array.isArray(exports_.inject) && exports_.inject.includes('slots'), JSON.stringify(exports_.inject))
 check('tab kind is stable', exports_.TAB_KIND === 'serial-debugger', exports_.TAB_KIND)
 
+// ── i18n ───────────────────────────────────────────────────────────────────
+// The header switch flips between two complete dictionaries, so a key present in
+// one and missing in the other would surface as a raw key name in the panel.
+const zhKeys = Object.keys(exports_.MESSAGES.zh).sort()
+const enKeys = Object.keys(exports_.MESSAGES.en).sort()
+check('both dictionaries carry the same keys', JSON.stringify(zhKeys) === JSON.stringify(enKeys), `zh=${zhKeys.length} en=${enKeys.length}`)
+check('no dictionary value is empty', zhKeys.every((k) => exports_.MESSAGES.zh[k] !== '') && enKeys.every((k) => exports_.MESSAGES.en[k] !== ''))
+check('dictionary size is plausible', zhKeys.length >= 50, `${zhKeys.length} keys`)
+check('zh and en actually differ', exports_.MESSAGES.zh.port !== exports_.MESSAGES.en.port, `${exports_.MESSAGES.zh.port} / ${exports_.MESSAGES.en.port}`)
+
+const tr = exports_.translate
+check('translate resolves a zh key', tr('zh', 'port') === '串口选择', tr('zh', 'port'))
+check('translate resolves an en key', tr('en', 'port') === 'Port', tr('en', 'port'))
+check('translate interpolates numbers', tr('zh', 'rxBytes', { n: 42 }) === '接收 42 B', tr('zh', 'rxBytes', { n: 42 }))
+check('translate interpolates onto en too', tr('en', 'entries', { n: 3 }) === '3 entries', tr('en', 'entries', { n: 3 }))
+check('translate interpolates an error message', tr('en', 'cannotReachHost', { msg: 'boom' }) === 'Cannot reach the serial host: boom', tr('en', 'cannotReachHost', { msg: 'boom' }))
+check('translate falls back to the key when missing', tr('en', 'no.such.key') === 'no.such.key', tr('en', 'no.such.key'))
+check('translate falls back to zh for an unknown locale', tr('de', 'port') === '串口选择', tr('de', 'port'))
+check('normalizeLocale maps zh tags to zh', exports_.normalizeLocale('zh-CN') === 'zh' && exports_.normalizeLocale('zh') === 'zh', exports_.normalizeLocale('zh-TW'))
+check('normalizeLocale maps everything else to en', exports_.normalizeLocale('en-US') === 'en' && exports_.normalizeLocale('fr') === 'en', exports_.normalizeLocale('fr'))
+check('tab label comes from the dictionary', JSON.stringify(exports_.SerialDebuggerTabTitle({})).includes('串口调试'))
+
 // ── manifest contract for a UI plugin ──────────────────────────────────────
 // The official decoration template requires platform + immediately + inject.
 // Without `immediately` the bundle is not materialized during boot, and without
@@ -250,7 +272,8 @@ check('renders the file controls', ['打开文件', '发送文件', '停止发�
 check('renders the send-mode checkboxes', joined.includes('16进制发送') && joined.includes('发送新行'))
 check('renders the progress readout', joined.includes('0%'))
 check('renders an empty-state hint', joined.includes('等待数据') || joined.includes('开始接收数据'))
-check('falls back to a text input when no port enumerates', tags.includes('input') && tags.filter((t) => t === 'select').length === 4, `selects=${tags.filter((t) => t === 'select').length}`)
+check('falls back to a text input when no port enumerates', tags.includes('input') && tags.filter((t) => t === 'select').length === 5, `selects=${tags.filter((t) => t === 'select').length} (4 parameters + the language switch)`)
+check('renders the language switch with both options', joined.includes('语言') && joined.includes('中文') && joined.includes('English'), `language label present=${joined.includes('语言')}`)
 check('renders the receive log container', tags.filter((t) => t === 'div').length > 5, `divs=${tags.filter((t) => t === 'div').length}`)
 check('renders the composer textarea', tags.includes('textarea'))
 
