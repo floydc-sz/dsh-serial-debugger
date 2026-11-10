@@ -85,7 +85,13 @@ check('published files exclude dev tooling', Array.isArray(manifest.files) && !m
 const files = Array.isArray(manifest.files) ? manifest.files : []
 check('catalog: dsh.bundle is declared, not just dsh.client', manifest.dsh.bundle !== undefined && typeof manifest.dsh.bundle.patch === 'string', JSON.stringify(manifest.dsh))
 check('catalog: the bundle patch ships in the package', files.includes('cordis.patch.yml'))
-check('catalog: version is the published 1.0.0', manifest.version === '1.0.0', String(manifest.version))
+// Assert the SHAPE, not a literal version: a literal here has to be edited on
+// every release and silently turns into a stale claim when someone forgets.
+check(
+	'catalog: version is a publishable semver',
+	typeof manifest.version === 'string' && /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(manifest.version) && manifest.version !== '0.0.0',
+	String(manifest.version),
+)
 check('catalog: the package is publishable', manifest.private !== true)
 check('catalog: keywords carry the dsh-plugin topic', Array.isArray(manifest.keywords) && manifest.keywords.includes('dsh-plugin'), JSON.stringify(manifest.keywords))
 check('catalog: a license is declared and shipped', manifest.license === 'MIT' && files.includes('LICENSE'), `${manifest.license} / ${JSON.stringify(files)}`)
