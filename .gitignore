@@ -4,6 +4,13 @@
 # Installed dependencies, if anyone runs pnpm/npm in the checkout.
 node_modules/
 
+# npm credentials must never be committed. `.npmrc` in the project directory is
+# read by npm/pnpm for publishing, so it is deliberately writable but untracked.
+.npmrc
+.npmrc.*
+npm-token.txt
+*.token
+
 # Logs and editor/OS noise.
 *.log
 Thumbs.db
