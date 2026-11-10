@@ -1,5 +1,7 @@
 # dsh-serial-debugger
 
+**中文** ｜ [English](README-EN.md)
+
 DeepSeek Harness 串口调试插件。在 DSH 界面内提供一个完整的串口监视/调试面板：**串口参数设置**、**实时接收并显示数据**、**发送数据**。
 
 - npm 包：`dsh-serial-debugger`
