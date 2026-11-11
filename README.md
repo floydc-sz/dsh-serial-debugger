@@ -46,8 +46,15 @@ dsh plugin --profile desktop add <本包路径>
 ### 系统要求
 
 - **Windows**：串口桥使用 .NET 的 `System.IO.Ports`，由 Windows 自带的 **Windows PowerShell 5.1** 提供，无需额外安装（已在 5.1 上验证）。
-- **Linux（Ubuntu 20.04+）**：系统没有 `System.IO.Ports`，串口桥改用 [`serialport`](https://www.npmjs.com/package/serialport) 原生绑定，已列为 `optionalDependencies`，安装插件时自动装上。
-- **国内环境提示**：`serialport` 自带预编译二进制；若某个平台没有预编译包，安装时会尝试本地编译，需要 `build-essential` 与 `python3`。
+- **Linux（Ubuntu 20.04+）**：系统没有 `System.IO.Ports`，串口桥改用 [`serialport`](https://www.npmjs.com/package/serialport) 原生绑定。**它不是本包的依赖，不会自动安装**——原生模块需要运行构建脚本，而 DSH 出于安全默认拦截，声明成依赖会让每次更新都失败。需要单独装一次：
+
+  ```bash
+  dsh plugin --profile <你的 profile> add serialport
+  ```
+
+  若 pnpm 报 `ERR_PNPM_IGNORED_BUILDS`，放行 `@serialport/bindings-cpp` 的构建脚本后重装（DSH 的提示条上就有「放行并重新安装」）。**Windows 不需要这一步，也不受影响**，因为 Windows 走 PowerShell 后端。
+- **预编译与本地编译**：`serialport` 自带预编译二进制；若目标平台没有，会自动尝试本地编译，需要 `build-essential` 与 `python3`。
+- **自定义绑定**：环境变量 `DSH_SERIAL_MODULE` 可指向另一个实现（同一套 `SerialPort` 接口），便于离线部署或替换。
 - **串口权限**：普通用户默认无权打开 `/dev/ttyUSB*`、`/dev/ttyACM*`。把用户加入串口组后**重新登录**：
 
   ```bash
@@ -60,6 +67,11 @@ dsh plugin --profile desktop add <本包路径>
 - 无构建步骤：客户端半边是预构建产物，两个后端脚本随包发布。
 
 ## 版本更新
+
+### 1.1.1 · 2026-11-11
+- **修复：Windows 上无法更新到 1.1.0**。原因是把 `serialport` 声明成了依赖，而它带原生构建脚本，DSH 出于安全默认拦截（`ERR_PNPM_IGNORED_BUILDS`），pnpm 因此整体失败——可 Windows 用的是 PowerShell 后端，根本不需要这个包。现已**不再声明该依赖**
+- Linux 用户改为显式安装一次（见「系统要求」），需要在时放行 `@serialport/bindings-cpp` 的构建脚本
+- 绑定缺失时的报错换成准确命令：`dsh plugin --profile <profile> add serialport`
 
 ### 1.1.0 · 2026-11-11
 - **新增 Linux 支持**（Ubuntu 20.04 及以后）：Linux 没有 `System.IO.Ports`，新增 Node 后端 `lib/serial-helper.mjs`，改用 `serialport` 原生绑定；**Windows 仍走原来的 PowerShell 后端，行为不变**

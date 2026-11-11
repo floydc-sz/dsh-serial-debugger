@@ -251,7 +251,7 @@ const byType = (type) => (event) => event.type === type
 	const moduleError = await bridge.waitFor((event) => event.type === 'error' && event.op === 'module')
 	check(
 		'the missing binding error explains how to install it',
-		/serialport binding is unavailable/i.test(moduleError.message) && /npm install serialport/.test(moduleError.message),
+		/serialport binding is unavailable/i.test(moduleError.message) && /dsh plugin --profile/.test(moduleError.message),
 		moduleError.message,
 	)
 	bridge.send({ op: 'ping' })

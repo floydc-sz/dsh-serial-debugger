@@ -135,11 +135,16 @@ check(
 	manifest.os === undefined || (manifest.os.includes('win32') && manifest.os.includes('linux')),
 	JSON.stringify(manifest.os),
 )
-// Linux/macOS need the native binding; Windows gets everything from PowerShell.
+// Regression guard. Shipping the native binding as a dependency made every
+// update fail with ERR_PNPM_IGNORED_BUILDS, because DSH blocks dependency build
+// scripts by default: pnpm resolved @serialport/bindings-cpp, refused to run its
+// install script, and aborted the whole update. Windows never loads the binding
+// (its bridge is PowerShell) and Linux installs it explicitly, so it must not
+// appear in either dependency field.
 check(
-	'catalog: the POSIX binding is an optional dependency',
-	manifest.optionalDependencies !== undefined && typeof manifest.optionalDependencies.serialport === 'string',
-	JSON.stringify(manifest.optionalDependencies),
+	'catalog: the native binding is not a declared dependency',
+	(manifest.dependencies?.serialport ?? manifest.optionalDependencies?.serialport) === undefined,
+	JSON.stringify({ dependencies: manifest.dependencies, optionalDependencies: manifest.optionalDependencies }),
 )
 check(
 	'catalog: the POSIX bridge script ships in the package',

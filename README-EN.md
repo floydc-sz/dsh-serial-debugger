@@ -46,8 +46,15 @@ After installing, restart DSH or let HMR apply, then open the panel as described
 ### Requirements
 
 - **Windows.** The serial bridge uses .NET's `System.IO.Ports`, provided by the **Windows PowerShell 5.1** that ships with Windows, so there is nothing extra to install (verified on 5.1).
-- **Linux (Ubuntu 20.04+).** There is no `System.IO.Ports` in the box, so the bridge drives the [`serialport`](https://www.npmjs.com/package/serialport) native binding instead. It is declared as an `optionalDependencies` entry and installs with the plugin.
-- **If no prebuilt binary exists** for a platform, `serialport` falls back to compiling locally, which needs `build-essential` and `python3`.
+- **Linux (Ubuntu 20.04+).** There is no `System.IO.Ports` in the box, so the bridge drives the [`serialport`](https://www.npmjs.com/package/serialport) native binding. It is **not a dependency of this package and is not installed automatically**: a native module needs to run a build script, DSH blocks those by default, and declaring it makes every update fail. Install it once:
+
+  ```bash
+  dsh plugin --profile <your profile> add serialport
+  ```
+
+  If pnpm reports `ERR_PNPM_IGNORED_BUILDS`, allow the build script of `@serialport/bindings-cpp` and reinstall — DSH's notice offers exactly that. **Windows needs none of this and is unaffected**, because its bridge is PowerShell.
+- **Prebuilt or compiled.** `serialport` ships prebuilt binaries; where none exists it compiles locally and needs `build-essential` and `python3`.
+- **Custom binding.** `DSH_SERIAL_MODULE` can point at another implementation of the same `SerialPort` surface, for offline deployments or a replacement.
 - **Serial permissions.** A regular user cannot open `/dev/ttyUSB*` or `/dev/ttyACM*` by default. Add yourself to the serial group and **log back in**:
 
   ```bash
@@ -60,6 +67,12 @@ After installing, restart DSH or let HMR apply, then open the panel as described
 - No build step: the client half is a prebuilt artifact and both bridge scripts ship in the package.
 
 ## Release Notes
+
+### 1.1.1 · 2026-11-11
+
+- **Fixed: 1.1.0 could not be updated to on Windows.** `serialport` had been declared as a dependency, and it carries a native build script. DSH blocks dependency build scripts by default (`ERR_PNPM_IGNORED_BUILDS`), so pnpm aborted the whole update — even though Windows uses the PowerShell bridge and never loads that package. The dependency is **no longer declared**.
+- Linux users install the binding themselves once (see Requirements), allowing the `@serialport/bindings-cpp` build script where pnpm asks.
+- The missing-binding message now names the exact command: `dsh plugin --profile <profile> add serialport`.
 
 ### 1.1.0 · 2026-11-11
 
