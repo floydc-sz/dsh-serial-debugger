@@ -6,7 +6,7 @@ DeepSeek Harness 串口调试插件。在 DSH 界面内提供一个完整的串�
 
 - npm 包：`dsh-serial-debugger`
 - 仓库：<https://github.com/floydc-sz/dsh-serial-debugger>
-- 平台：**仅 Windows**
+- 平台：**Windows / Linux**（Ubuntu 20.04 及以后）
 
 ---
 
@@ -20,7 +20,7 @@ DeepSeek Harness 串口调试插件。在 DSH 界面内提供一个完整的串�
 
 | 界面    | 能力                                                                                                                    |
 | ----- | --------------------------------------------------------------------------------------------------------------------- |
-| 参数区   | 「串口选择」下拉显示 `COM3:USB-SERIAL CH340` 形式的**设备描述**，可「刷新」重新枚举；无可枚举串口时自动降级为手输框。「波特率」「停止位」「数据位」「校验位」下拉；「串口操作」打开/关闭串口，连接后参数锁定 |
+| 参数区   | 「串口选择」下拉显示 `COM3:USB-SERIAL CH340`（Linux 上形如 `/dev/ttyUSB0:FTDI`）的**设备描述**，可「刷新」重新枚举；无可枚举串口时自动降级为手输框。「波特率」「停止位」「数据位」「校验位」下拉；「串口操作」打开/关闭串口，连接后参数锁定 |
 | 操作与开关 | 「保存窗口」把接收区导出为 .txt；「清除接收」；「16进制显示」「DTR」「RTS」「自动滚动」「时间戳」                                                               |
 | 接收区   | 占满剩余高度，实时追加显示，文本或十六进制视图、可选时间戳、自动滚动（手动上滚时自动暂停）；发送内容以 `→` 前缀弱化显示；底部状态行显示连接指示、当前参数、收发字节数与条数                              |
 | 发送区   | 「单条发送」/「帮助」标签页；发送输入框（`Ctrl+Enter` 发送）与「发送」「清除发送」                                                                      |
@@ -45,11 +45,28 @@ dsh plugin --profile desktop add <本包路径>
 
 ### 系统要求
 
-- **Windows**。串口桥使用 .NET 的 `System.IO.Ports`，由 Windows 自带的 **Windows PowerShell 5.1** 提供，无需额外安装（已在 5.1 上验证）。
+- **Windows**：串口桥使用 .NET 的 `System.IO.Ports`，由 Windows 自带的 **Windows PowerShell 5.1** 提供，无需额外安装（已在 5.1 上验证）。
+- **Linux（Ubuntu 20.04+）**：系统没有 `System.IO.Ports`，串口桥改用 [`serialport`](https://www.npmjs.com/package/serialport) 原生绑定，已列为 `optionalDependencies`，安装插件时自动装上。
+- **国内环境提示**：`serialport` 自带预编译二进制；若某个平台没有预编译包，安装时会尝试本地编译，需要 `build-essential` 与 `python3`。
+- **串口权限**：普通用户默认无权打开 `/dev/ttyUSB*`、`/dev/ttyACM*`。把用户加入串口组后**重新登录**：
+
+  ```bash
+  sudo usermod -aG dialout $USER    # Ubuntu / Debian / Fedora
+  sudo usermod -aG uucp    $USER    # Arch
+  ```
+
+  未加入时打开会得到明确提示（而不是一个裸 `EACCES`）。
 - **DSH `^0.2.0-rc.1`**（见 `package.json` 的 `dsh.engines.dsh`）。
-- 零 npm 依赖、无原生编译、无构建步骤。
+- 无构建步骤：客户端半边是预构建产物，两个后端脚本随包发布。
 
 ## 版本更新
+
+### 1.1.0 · 2026-11-11
+- **新增 Linux 支持**（Ubuntu 20.04 及以后）：Linux 没有 `System.IO.Ports`，新增 Node 后端 `lib/serial-helper.mjs`，改用 `serialport` 原生绑定；**Windows 仍走原来的 PowerShell 后端，行为不变**
+- 后端按平台选择：`DSH_SERIAL_HELPER` 指向 `.mjs`/`.js` 时用当前 Node 运行，否则 Windows 交给 PowerShell——后端因此可替换，测试替身也不必是 PowerShell
+- Linux 专项处理：`/dev/ttyS*` 主板串口自动过滤、`EACCES` 给出加入 `dialout`/`uucp` 组的可执行提示、`1.5` 停止位明确拒绝（termios 不支持）
+- `os` 字段不再限制 Windows；`serialport` 列为 `optionalDependencies`，缺失时给出安装指引而不是崩溃
+- 测试运行器改为 `tools/run-tests.mjs`（跨平台），`run-tests.ps1` / `run-tests.sh` 为薄封装
 
 ### 1.0.4 · 2026-11-10
 - 语言切换从界面顶部单独一行移入参数区首行，与「串口选择」**同一行**（右端），省掉一整行高度

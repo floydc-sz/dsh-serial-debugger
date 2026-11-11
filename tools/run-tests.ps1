@@ -2,15 +2,13 @@
 #
 #   powershell -ExecutionPolicy Bypass -File tools\run-tests.ps1
 #
-# Locates a Node runtime (PATH, then the DSH primary runtime) and runs the four
-# hardware-free suites. Exits non-zero if any suite fails.
+# Thin shim: the runner lives in tools/run-tests.mjs so that one command works on
+# Windows and Linux alike. This file only locates a Node runtime.
 
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
-
-$toolsDir = $PSScriptRoot
 
 function Resolve-Node {
     $fromPath = Get-Command node -ErrorAction SilentlyContinue
@@ -26,26 +24,5 @@ function Resolve-Node {
 }
 
 $node = Resolve-Node
-Write-Host "node: $node"
-Write-Host ""
-
-$suites = @(
-    @{ Name = 'serial bridge protocol'; File = 'test-helper.mjs' },
-    @{ Name = 'host half + HTTP route'; File = 'test-host.mjs' },
-    @{ Name = 'client bundle + render'; File = 'test-client.mjs' },
-    @{ Name = 'full data path (loopback)'; File = 'test-loopback.mjs' }
-)
-
-$failed = @()
-foreach ($suite in $suites) {
-    Write-Host "--- $($suite.Name) ---"
-    & $node (Join-Path $toolsDir $suite.File)
-    if ($LASTEXITCODE -ne 0) { $failed += $suite.Name }
-    Write-Host ""
-}
-
-if ($failed.Count -gt 0) {
-    Write-Host "FAILED: $($failed -join ', ')"
-    exit 1
-}
-Write-Host "all suites passed"
+& $node (Join-Path $PSScriptRoot 'run-tests.mjs')
+exit $LASTEXITCODE

@@ -8,8 +8,9 @@ import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
-// Point the host half at the hardware-free bridge before importing it.
-process.env.DSH_SERIAL_HELPER = join(here, 'fake-serial-bridge.ps1')
+// Point the host half at the hardware-free bridge before importing it. The
+// double is a Node script, so the host runs it on every platform.
+process.env.DSH_SERIAL_HELPER = join(here, 'fake-serial-bridge.mjs')
 
 const { apply, name } = await import(pathToFileURL(join(here, '..', 'lib', 'index.js')).href)
 

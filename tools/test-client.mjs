@@ -128,7 +128,24 @@ const dshRange = (manifest.dsh.engines && manifest.dsh.engines.dsh) || (manifest
 check('catalog: the DSH host range is declared', typeof dshRange === 'string' && dshRange !== '', String(dshRange))
 check('catalog: the host range reaches prerelease builds', typeof dshRange === 'string' && /0\.2\.0-[0-9A-Za-z.-]+/.test(dshRange), String(dshRange))
 check('catalog: npm publish access is public', manifest.publishConfig !== undefined && manifest.publishConfig.access === 'public', JSON.stringify(manifest.publishConfig))
-check('catalog: the plugin is declared Windows-only', Array.isArray(manifest.os) && manifest.os.includes('win32'), JSON.stringify(manifest.os))
+// The package now ships both bridges, so `os` must not exclude Linux. Leaving the
+// field out entirely is the widest declaration; listing both is equally correct.
+check(
+	'catalog: the package installs on Windows and Linux',
+	manifest.os === undefined || (manifest.os.includes('win32') && manifest.os.includes('linux')),
+	JSON.stringify(manifest.os),
+)
+// Linux/macOS need the native binding; Windows gets everything from PowerShell.
+check(
+	'catalog: the POSIX binding is an optional dependency',
+	manifest.optionalDependencies !== undefined && typeof manifest.optionalDependencies.serialport === 'string',
+	JSON.stringify(manifest.optionalDependencies),
+)
+check(
+	'catalog: the POSIX bridge script ships in the package',
+	fs.existsSync(join(here, '..', 'lib', 'serial-helper.mjs')) && (files.includes('lib') || files.includes('serial-helper.mjs')),
+	`files=${JSON.stringify(files)}`,
+)
 
 // ── right sidebar tab registration ─────────────────────────────────────────
 // The native seat declares `sidebar.right.pane.tab` BEFORE it provides

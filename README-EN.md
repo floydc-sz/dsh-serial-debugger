@@ -6,7 +6,7 @@ A serial-port debugger plugin for DeepSeek Harness. It puts a complete serial mo
 
 - npm package: `dsh-serial-debugger`
 - Repository: <https://github.com/floydc-sz/dsh-serial-debugger>
-- Platform: **Windows only**
+- Platform: **Windows / Linux** (Ubuntu 20.04 and later)
 
 ---
 
@@ -20,7 +20,7 @@ The plugin's UI lives in the **Harness main window's right sidebar**, as a nativ
 
 | Surface | Capability |
 | --- | --- |
-| Parameters | The **「串口选择/Port」** dropdown shows each device as `COM3:USB-SERIAL CH340`, including a **device description**, and **「刷新/Refresh」** re-enumerates; when nothing can be enumerated it falls back to a free-text field. **「波特率/Baud rate」**, **「停止位/Stop bits」**, **「数据位/Data bits」** and **「校验位/Parity」** dropdowns. **「串口操作/Port action」** opens and closes the port, and the parameters lock while connected. |
+| Parameters | The **「串口选择/Port」** dropdown shows each device as `COM3:USB-SERIAL CH340` on Windows (`/dev/ttyUSB0:FTDI` on Linux), including a **device description**, and **「刷新/Refresh」** re-enumerates; when nothing can be enumerated it falls back to a free-text field. **「波特率/Baud rate」**, **「停止位/Stop bits」**, **「数据位/Data bits」** and **「校验位/Parity」** dropdowns. **「串口操作/Port action」** opens and closes the port, and the parameters lock while connected. |
 | Actions and switches | **「保存窗口/Save window」** exports the receive area to a .txt file; **「清除接收/Clear receive」**; **「16进制显示/Hex display」**, **「DTR」**, **「RTS」**, **「自动滚动/Auto-scroll」**, **「时间戳/Timestamps」**. |
 | Receive area | Fills the remaining height and appends data live, in text or hex view, with optional timestamps and auto-scroll (which pauses itself when you scroll up by hand). Sent data is shown dimmed with a `→` prefix, and a status line along the bottom shows the connection indicator, the current parameters, the send/receive byte counts and the entry count. |
 | Send area | **「单条发送/Single send」** / **「帮助/Help」** tabs; a send box (`Ctrl+Enter` sends) plus **「发送/Send」** and **「清除发送/Clear send」**. |
@@ -46,10 +46,28 @@ After installing, restart DSH or let HMR apply, then open the panel as described
 ### Requirements
 
 - **Windows.** The serial bridge uses .NET's `System.IO.Ports`, provided by the **Windows PowerShell 5.1** that ships with Windows, so there is nothing extra to install (verified on 5.1).
+- **Linux (Ubuntu 20.04+).** There is no `System.IO.Ports` in the box, so the bridge drives the [`serialport`](https://www.npmjs.com/package/serialport) native binding instead. It is declared as an `optionalDependencies` entry and installs with the plugin.
+- **If no prebuilt binary exists** for a platform, `serialport` falls back to compiling locally, which needs `build-essential` and `python3`.
+- **Serial permissions.** A regular user cannot open `/dev/ttyUSB*` or `/dev/ttyACM*` by default. Add yourself to the serial group and **log back in**:
+
+  ```bash
+  sudo usermod -aG dialout $USER    # Ubuntu / Debian / Fedora
+  sudo usermod -aG uucp    $USER    # Arch
+  ```
+
+  Without that, opening the port reports exactly this rather than a bare `EACCES`.
 - **DSH `^0.2.0-rc.1`** (see `dsh.engines.dsh` in `package.json`).
-- No npm dependencies, no native compilation, no build step.
+- No build step: the client half is a prebuilt artifact and both bridge scripts ship in the package.
 
 ## Release Notes
+
+### 1.1.0 · 2026-11-11
+
+- **Linux support** (Ubuntu 20.04 and later). Linux has no `System.IO.Ports`, so a Node bridge — `lib/serial-helper.mjs` — drives the `serialport` native binding instead. **Windows keeps the original PowerShell bridge; nothing changes there.**
+- The backend is chosen by platform: a `DSH_SERIAL_HELPER` pointing at `.mjs`/`.js` runs on the current Node, anything else goes to PowerShell on Windows. That makes the backend swappable, and means the test double no longer has to be PowerShell.
+- Linux specifics: `/dev/ttyS*` legacy ports are filtered out, `EACCES` becomes an actionable "join the `dialout`/`uucp` group" message, and 1.5 stop bits is refused with a reason (termios has no such setting).
+- The `os` field no longer restricts to Windows; `serialport` is an `optionalDependencies` entry and reports how to install itself if it is missing, instead of crashing.
+- The test runner is now `tools/run-tests.mjs` (cross-platform); `run-tests.ps1` and `run-tests.sh` are thin shims.
 
 ### 1.0.4 · 2026-11-10
 
