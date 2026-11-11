@@ -1,6 +1,6 @@
 {
   "name": "dsh-serial-debugger",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "DeepSeek Harness 串口调试插件：串口参数设置、实时接收显示（文本/十六进制）、数据发送。Serial debugger plugin for DeepSeek Harness: port parameter setup, live receive display (text/hex) and data transmission.",
   "repository": {
     "type": "git",

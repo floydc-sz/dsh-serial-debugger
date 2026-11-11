@@ -20,12 +20,16 @@ The plugin's UI lives in the **Harness main window's right sidebar**, as a nativ
 
 | Surface | Capability |
 | --- | --- |
-| Parameters | The **「串口选择/Port」** dropdown shows each device as `COM3:USB-SERIAL CH340` on Windows (`/dev/ttyUSB0:FTDI` on Linux), including a **device description**, and **「刷新/Refresh」** re-enumerates; when nothing can be enumerated it falls back to a free-text field. **「波特率/Baud rate」**, **「停止位/Stop bits」**, **「数据位/Data bits」** and **「校验位/Parity」** dropdowns. **「串口操作/Port action」** opens and closes the port, and the parameters lock while connected. |
-| Actions and switches | **「保存窗口/Save window」** exports the receive area to a .txt file; **「清除接收/Clear receive」**; **「16进制显示/Hex display」**, **「DTR」**, **「RTS」**, **「自动滚动/Auto-scroll」**, **「时间戳/Timestamps」**. |
-| Receive area | Fills the remaining height and appends data live, in text or hex view, with optional timestamps and auto-scroll (which pauses itself when you scroll up by hand). Sent data is shown dimmed with a `→` prefix, and a status line along the bottom shows the connection indicator, the current parameters, the send/receive byte counts and the entry count. |
-| Send area | **「单条发送/Single send」** / **「帮助/Help」** tabs; a send box (`Ctrl+Enter` sends) plus **「发送/Send」** and **「清除发送/Clear send」**. |
-| Send options | **「定时发送/Timed send」** plus a period in milliseconds; **「打开文件/Open file」**, **「发送文件/Send file」** and **「停止发送/Stop sending」** — 1 KB chunks with a progress percentage; **「16进制发送/Hex send」** (which accepts both `AA 55 01` and `0xAA,0x55`); **「发送新行/Append newline」** (which adds CRLF). |
-| Language | The switch on the **same row as 「串口选择/Port」** (top of the parameters band, at its right end) toggles the whole surface between **中文** and **English**; the choice is remembered, and with no choice made it follows the language DSH itself runs in. |
+| Parameters · first row | The **「串口选择/Port」** dropdown shows each device with its description (`COM3:USB-SERIAL CH340` on Windows, `/dev/ttyUSB0:FTDI` on Linux), and **「刷新/Refresh」** re-enumerates; when nothing enumerates it falls back to a free-text field. The right end of the same row holds **「语言/Language」** and **「帮助/Help」**. |
+| Parameters · values | **「波特率/Baud rate」**, **「停止位/Stop bits」**, **「数据位/Data bits」** and **「校验位/Parity」**, in two rows of two, each name beside its control. |
+| Parameters · actions | **「串口操作/Port action」** opens or closes the port and locks the parameters while connected; **「保存窗口/Save window」** exports the receive area to .txt; **「清除接收/Clear receive」** empties it. |
+| Parameters · switches | **「16进制显示/Hex display」**, **「DTR」**, **「RTS」**, **「自动滚动/Auto-scroll」**, **「时间戳/Timestamps」**. |
+| Receive area | Fills the remaining height; **data that arrives in pieces is merged into one line**, and only newlines in the data break lines. Sent data is shown dimmed with a `→` prefix, and a status line shows the connection, the parameters, the byte counts and the line count. |
+| Send area · input | The composer is five rows tall at 13px, `Ctrl+Enter` sends, and **「发送/Send」** / **「清除发送/Clear send」** sit beside it. |
+| Send area · switches | **Above** the composer: **「16进制发送/Hex send」** (accepts `AA 55 01` and `0xAA,0x55`), **「发送新行/Append newline」**, **「定时发送/Timed send」** and its **「周期/Period」** in milliseconds. |
+| Send area · files | **「打开文件/Open file」**, **「发送文件/Send file」** and **「停止发送/Stop sending」**, left-aligned, with the transfer progress bar and percentage on the same line. |
+| Help | Opens a two-column table (control / what it does) with one entry per control, in the same order as the surface; close it with 「关闭/Close」 or by clicking the backdrop. |
+| Language | The **「语言/Language」** dropdown switches the whole surface between 中文 and English; the choice is remembered, and with no choice made it follows the language DSH runs in. |
 
 Colors and fonts come from DSH theme tokens, so the panel follows the host's light and dark themes.
 
@@ -67,6 +71,15 @@ After installing, restart DSH or let HMR apply, then open the panel as described
 - No build step: the client half is a prebuilt artifact and both bridge scripts ship in the package.
 
 ## Release Notes
+
+### 1.1.2 · 2026-11-11
+
+- Receive area: **chunks that arrive in pieces are merged into one line**, and only newlines in the data break lines (each chunk used to get its own line, which read as random line breaks). Multi-byte characters split across chunks no longer break into replacement characters.
+- Timestamps: with the switch on, **every line** carries the time it started arriving instead of the block carrying one time, and the bytes are still joined before decoding so CJK stays intact.
+- Both text wells: a stronger border, 12 → 13px type, and the composer grows from three rows to five.
+- Send band: 「16进制发送」, 「发送新行」, 「定时发送」 and 「周期」 moved **above** the composer; the file buttons and the progress bar now share one left-aligned line.
+- Parameters: the language switch shares the port row, 「帮助」 moved to the right of it, the port selector takes a third of the row, and the action buttons are a fixed 86px with 帮助 at 57px.
+- Help is an overlay holding a two-column table (control / what it does), one entry per control, in on-screen order, with a centred tinted header.
 
 ### 1.1.1 · 2026-11-11
 

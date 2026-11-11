@@ -85,6 +85,53 @@ check('normalizeLocale maps zh tags to zh', exports_.normalizeLocale('zh-CN') ==
 check('normalizeLocale maps everything else to en', exports_.normalizeLocale('en-US') === 'en' && exports_.normalizeLocale('fr') === 'en', exports_.normalizeLocale('fr'))
 check('tab label comes from the dictionary', JSON.stringify(exports_.SerialDebuggerTabTitle({})).includes('串口调试'))
 
+// ── receive rows ───────────────────────────────────────────────────────────
+// A serial port delivers whatever bytes the driver had, so one logical message
+// can arrive as many chunks. Grouping is what stops an ordinary message from
+// looking as if line breaks had been sprinkled into it.
+const b64Of = (bytes) => Buffer.from(bytes).toString('base64')
+const rxEntry = (bytes, seq) => ({ kind: 'rx', b64: b64Of(bytes), at: 1000 + seq, seq })
+const txEntry = (bytes, seq) => ({ kind: 'tx', b64: b64Of(bytes), at: 1000 + seq, seq })
+
+let rows = exports_.groupRows([rxEntry('Hel', 1), rxEntry('lo', 2)])
+check('consecutive receive chunks collapse into one row', rows.length === 1 && rows[0].entries.length === 2, `rows=${rows.length}`)
+check('a split payload reads as one message', exports_.formatRow(rows[0], false, false) === 'Hello', JSON.stringify(exports_.formatRow(rows[0], false, false)))
+
+rows = exports_.groupRows([rxEntry('A', 1), txEntry('B', 2), rxEntry('C', 3)])
+check('a transmit breaks the receive run', rows.map((r) => r.kind).join(',') === 'rx,tx,rx', rows.map((r) => r.kind).join(','))
+
+// '中' is E4 B8 AD. Split it across two chunks: bytes must be joined before decoding.
+const han = Buffer.from('中', 'utf8')
+rows = exports_.groupRows([rxEntry(han.subarray(0, 1), 1), rxEntry(han.subarray(1), 2)])
+check('a multi-byte character split across chunks decodes intact', exports_.formatRow(rows[0], false, false) === '中', JSON.stringify(exports_.formatRow(rows[0], false, false)))
+
+rows = exports_.groupRows([rxEntry([0xaa, 0x55], 1), rxEntry([0x01, 0x02], 2)])
+check('hex view joins the chunks into one dump', exports_.formatRow(rows[0], true, false) === 'aa 55 01 02', exports_.formatRow(rows[0], true, false))
+
+rows = exports_.groupRows([rxEntry('line1\r\n', 1), rxEntry('line2', 2)])
+check('a real newline in the payload still breaks the line', exports_.formatRow(rows[0], false, false).includes('\n'), JSON.stringify(exports_.formatRow(rows[0], false, false)))
+
+rows = exports_.groupRows([rxEntry('A', 1), rxEntry('B', 2)])
+check('timestamp mode still merges the arrivals into one line', exports_.formatRow(rows[0], false, true) === '08:00:01.001 AB', JSON.stringify(exports_.formatRow(rows[0], false, true)))
+
+rows = exports_.groupRows([1, 2, 3, 4, 5].map((n) => rxEntry('x'.repeat(2000), n)))
+check('an endless stream is split into bounded rows', rows.length > 1, `rows=${rows.length}`)
+
+// Timestamps: the row still merges (so bytes join before decoding), but every
+// text line inside it is stamped with the arrival that began it.
+rows = exports_.groupRows([rxEntry('line one\n', 1), rxEntry('line two\n', 2)])
+const twoLines = exports_.formatRow(rows[0], false, true).split('\n')
+check('a merged row stamps every text line', twoLines.length === 2, JSON.stringify(twoLines))
+check('each line carries the arrival that began it', twoLines[0].startsWith('08:00:01.001 ') && twoLines[1].startsWith('08:00:01.002 '), JSON.stringify(twoLines))
+check('a trailing line break does not add an empty stamped line', !exports_.formatRow(rows[0], false, true).endsWith('\n'), JSON.stringify(exports_.formatRow(rows[0], false, true)))
+
+// The merge is what keeps a split character intact, so it must hold with stamps on.
+rows = exports_.groupRows([rxEntry(han.subarray(0, 1), 1), rxEntry(han.subarray(1), 2)])
+check('timestamp mode still decodes a split character', exports_.formatRow(rows[0], false, true).endsWith('中'), JSON.stringify(exports_.formatRow(rows[0], false, true)))
+
+rows = exports_.groupRows([rxEntry('no newline here', 1), rxEntry(' at all', 2)])
+check('a single line gets a single stamp', (exports_.formatRow(rows[0], false, true).match(/\d{2}:\d{2}:\d{2}\.\d{3}/g) ?? []).length === 1, JSON.stringify(exports_.formatRow(rows[0], false, true)))
+
 // ── manifest contract for a UI plugin ──────────────────────────────────────
 // The official decoration template requires platform + immediately + inject.
 // Without `immediately` the bundle is not materialized during boot, and without
@@ -285,9 +332,21 @@ check(
 )
 check('does not render a flow-control control', !joined.includes('流控') && !joined.includes('XOnXOff'), joined.includes('流控') ? '流控 present' : 'absent')
 check('renders the open-port control', joined.includes('打开串口'))
+// The label is a row sibling rather than a fixed-width Field: a Field's unused
+// width sat inside the box and made the first gap wider than the rest.
+check('the port-action label shares the row, so every gap matches', !source.includes('label: t("portAction")') && (source.match(/t\("portAction"\)/g) ?? []).length === 1, `${(source.match(/t\("portAction"\)/g) ?? []).length} label`)
+// Three action buttons draw at one width, so they read as a row of peers; 帮助 is
+// narrower because it sits in the row above and its label is two characters.
+check('the action buttons share one width and 帮助 is narrower', (source.match(/width: ACTION_BUTTON_WIDTH/g) ?? []).length === 3 && (source.match(/width: HELP_BUTTON_WIDTH/g) ?? []).length === 1, `${(source.match(/width: ACTION_BUTTON_WIDTH/g) ?? []).length} action + ${(source.match(/width: HELP_BUTTON_WIDTH/g) ?? []).length} help`)
 check('renders the window actions', joined.includes('保存窗口') && joined.includes('清除接收'))
+// Clearing the log is routine and reversible, so it wears the normal ink rather
+// than the danger red reserved for closing a port and stopping a transfer.
+check('清除接收 uses the normal ink', !source.includes('onClick: clearReceive, disabled: lines.length === 0, tone: "danger"'), 'no danger tone')
 check('renders the display checkboxes', ['16进制显示', 'DTR', 'RTS', '自动滚动', '时间戳'].every((label) => joined.includes(label)))
-check('renders the send block tabs', joined.includes('单条发送') && joined.includes('帮助'))
+// The send band lost its tab strip: 帮助 moved into the parameters action row and
+// the composer is always the band, so "单条发送" must be gone for good.
+check('the send tab strip is gone', !joined.includes('单条发送'), joined.includes('单条发送') ? '单条发送 still rendered' : 'absent')
+check('renders the help toggle', joined.includes('帮助'))
 check('renders the send and clear-send controls', joined.includes('发送') && joined.includes('清除发送'))
 check('renders the timed-send row', joined.includes('定时发送') && joined.includes('周期:'))
 check('renders the file controls', ['打开文件', '发送文件', '停止发送'].every((label) => joined.includes(label)))
@@ -296,14 +355,92 @@ check('renders the progress readout', joined.includes('0%'))
 check('renders an empty-state hint', joined.includes('等待数据') || joined.includes('开始接收数据'))
 check('falls back to a text input when no port enumerates', tags.includes('input') && tags.filter((t) => t === 'select').length === 5, `selects=${tags.filter((t) => t === 'select').length} (4 parameters + the language switch)`)
 check('renders the language switch with both options', joined.includes('语言') && joined.includes('中文') && joined.includes('English'), `language label present=${joined.includes('语言')}`)
+// The port field is a third of the row and may shrink (`0 1`), because the row never
+// wraps and also carries 帮助 — a rigid third would overflow a narrow sidebar.
+check(
+	'the port field takes a third and shares the row with the switch',
+	!source.includes('h(Field, { label: t("port"), width: 214 }') && source.includes('h(Field, { label: t("port"), flex: "0 1 33%" }') && source.includes('flexWrap: "nowrap"'),
+	'one-third shrinkable port field, non-wrapping row',
+)
 check('renders the receive log container', tags.filter((t) => t === 'div').length > 5, `divs=${tags.filter((t) => t === 'div').length}`)
 check('renders the composer textarea', tags.includes('textarea'))
+// The two text wells carry their own border token; at the section border they
+// were nearly invisible against the panel. A silent revert here is a visual
+// regression no behavioural check would catch.
+const inputBorderUses = source.split('${COLORS.borderInput}').length - 1
+check('both text wells use the stronger input border', inputBorderUses === 2 && source.includes('borderInput:'), `usages=${inputBorderUses}`)
+// One type size shared by both wells, one step above the surrounding controls.
+const textSizeUses = source.split('fontSize: TEXT_SIZE,').length - 1
+check('both text wells share one type size', textSizeUses === 2, `usages=${textSizeUses}`)
+check('the text size is larger than the control size', /const TEXT_SIZE = (\d+);/.test(source) && Number(source.match(/const TEXT_SIZE = (\d+);/)[1]) > 12, source.match(/const TEXT_SIZE = \d+;/)?.[0])
+// Every button draws its label at one size, so 帮助 and 打开串口 cannot drift apart.
+check('all buttons share one type size', source.split('fontSize: BUTTON_SIZE,').length - 1 === 1 && /const BUTTON_SIZE = (\d+);/.test(source), source.match(/const BUTTON_SIZE = \d+;/)?.[0])
+// Help opens over the panel instead of taking the send band's place.
+check('the help text stays out of the panel until opened', !joined.includes('接收与发送都按到达分块显示'), joined.includes('接收与发送都按到达分块显示') ? 'help text rendered inline' : 'absent')
+check('the help overlay is positioned against the panel', source.includes('position: "relative"') && source.includes('position: "absolute"'), 'relative ancestor + absolute overlay')
+// The help must actually explain the three switches a reader has to guess at.
+// One entry per control, laid out in the order the controls appear.
+check(
+	'the help explains DTR, RTS and auto-scroll',
+	['hDtr', 'hRts', 'hAutoScroll'].every((key) => exports_.HELP_KEYS.includes(key) && tr('zh', key).length > 10 && tr('en', key).length > 10),
+	exports_.HELP_KEYS.length + ' entries',
+)
+check('each explanation names its own control', tr('zh', 'hDtr').includes('「DTR」') && tr('zh', 'hRts').includes('「RTS」') && tr('zh', 'hAutoScroll').includes('「自动滚动」'))
+check('no help line merges two controls', exports_.HELP_KEYS.every((key) => (exports_.MESSAGES.zh[key].match(/「/g) ?? []).length <= 1), exports_.HELP_KEYS.filter((key) => (exports_.MESSAGES.zh[key].match(/「/g) ?? []).length > 1).join(','))
+check('every control in the panel has an entry', exports_.HELP_KEYS.length === 25, `${exports_.HELP_KEYS.length} entries`)
+// The receive area and the send box explain themselves on screen; listing them only
+// made the reader scroll past the controls they were actually looking up.
+check(
+	'the receive area and send box are not listed',
+	!exports_.HELP_KEYS.includes('hReceive') && !exports_.HELP_KEYS.includes('hComposer') && exports_.MESSAGES.zh.hReceive === undefined && exports_.MESSAGES.en.hComposer === undefined,
+	exports_.HELP_KEYS.join(','),
+)
+// The help is a two-column table: the control in one cell, its explanation in the
+// next. Every entry has to split in both languages, or a row loses its control name.
+const zhBaud = exports_.helpContent(tr('zh', 'hBaud'))
+check('a help line splits into its control and its explanation', zhBaud.term === '波特率' && zhBaud.text.startsWith('通信速率'), JSON.stringify(zhBaud))
+const enBaud = exports_.helpContent(tr('en', 'hBaud'))
+check('the English form splits the same way', enBaud.term === '波特率/Baud rate' && enBaud.text.length > 10, JSON.stringify(enBaud))
+check('the control column carries no quotes', !/[「」"]/.test(zhBaud.term) && !/["「」]/.test(enBaud.term), `${zhBaud.term} / ${enBaud.term}`)
+const unsplit = exports_.HELP_KEYS.filter((key) => ['zh', 'en'].some((locale) => exports_.helpContent(exports_.MESSAGES[locale][key]).term === ''))
+check('every help entry splits in both languages', unsplit.length === 0, unsplit.join(',') || 'all split')
+check('the help renders as a table with two columns', source.includes('"table"') && tr('zh', 'helpTerm') === '控件' && tr('en', 'helpText').length > 0, `${tr('zh', 'helpTerm')} / ${tr('en', 'helpText')}`)
+// The header is a band: centred text on a tint that is one step deeper than the
+// surface tokens offer. Only that row carries it — the popup itself stays plain.
+// The control column below is centred too, so names line up under their header.
+check(
+	'the help table header is a centred, tinted band',
+	(source.match(/textAlign: "center"/g) ?? []).length === 3 && (source.match(/color-mix\(in srgb, var\(--dsw-alias-bg-layer-2/g) ?? []).length === 1,
+	`${(source.match(/textAlign: "center"/g) ?? []).length} centred cells (2 header + the control column), ${(source.match(/color-mix\(in srgb, var\(--dsw-alias-bg-layer-2/g) ?? []).length} tinted row`,
+)
 
 // The three bands must appear in the requested order: parameters, receive, send.
 const at = (needle) => texts.findIndex((text) => text.includes(needle))
 check('parameters band precedes the receive band', at('串口选择') >= 0 && at('串口选择') < at('开始接收数据'), `parameters=${at('串口选择')} receive=${at('开始接收数据')}`)
-check('receive band precedes the send band', at('开始接收数据') >= 0 && at('开始接收数据') < at('单条发送'), `receive=${at('开始接收数据')} send=${at('单条发送')}`)
-check('send options follow the composer', at('单条发送') < at('16进制发送') && at('16进制发送') < at('发送新行'), `composer=${at('单条发送')} options=${at('16进制发送')}`)
+check('receive band precedes the send band', at('开始接收数据') >= 0 && at('开始接收数据') < at('清除发送'), `receive=${at('开始接收数据')} send=${at('清除发送')}`)
+// The input-mode switches moved above the box they modify, so they precede the
+// composer row rather than trailing the file controls.
+check('the send-mode switches sit above the composer', at('开始接收数据') < at('16进制发送') && at('16进制发送') < at('发送新行') && at('发送新行') < at('清除发送'), `receive=${at('开始接收数据')} hexSend=${at('16进制发送')} newline=${at('发送新行')} composer=${at('清除发送')}`)
+check('timed send and the period share that row', at('发送新行') < at('定时发送') && at('定时发送') < at('周期:') && at('周期:') < at('清除发送'), `newline=${at('发送新行')} timed=${at('定时发送')} period=${at('周期:')}`)
+check('the file controls follow the composer', at('清除发送') < at('打开文件') && at('打开文件') < at('发送文件'), `composer=${at('清除发送')} open=${at('打开文件')}`)
+// 帮助 belongs to the parameters band now, right after 清除接收 — not to the send band.
+// 帮助 sits at the right end of the port row, after the language switch.
+check('the help toggle follows the language switch in the first row', at('语言') >= 0 && at('语言') < at('帮助') && at('帮助') < at('波特率'), `language=${at('语言')} help=${at('帮助')} baud=${at('波特率')}`)
+// The claimed order must be the real one: read it back off the rendered tree.
+const LAYOUT_ORDER = ['串口选择', '刷新', '语言', '帮助', '波特率', '停止位', '数据位', '校验位', '串口操作', '保存窗口', '清除接收', '16进制显示', 'DTR', 'RTS', '自动滚动', '时间戳']
+const layoutPositions = LAYOUT_ORDER.map((label) => at(label))
+check('the controls really sit in that order', layoutPositions.every((pos, i) => pos >= 0 && (i === 0 || layoutPositions[i - 1] < pos)), layoutPositions.join(','))
+check(
+	'the help follows the on-screen order, top to bottom then left to right',
+	exports_.HELP_KEYS.slice(0, LAYOUT_ORDER.length).join(',') === 'hPort,hRefresh,hLanguage,hHelp,hBaud,hStopBits,hDataBits,hParity,hPortAction,hSaveWindow,hClearReceive,hHexView,hDtr,hRts,hAutoScroll,hTimestamps',
+	exports_.HELP_KEYS.slice(0, LAYOUT_ORDER.length).join(','),
+)
+check(
+	'the help keeps that order through the send band',
+	exports_.HELP_KEYS.slice(LAYOUT_ORDER.length).join(',') === 'hHexSend,hNewline,hTimedSend,hPeriod,hSend,hClearSend,hOpenFile,hSendFile,hStopSending',
+	exports_.HELP_KEYS.slice(LAYOUT_ORDER.length).join(','),
+)
+check('the composer is taller than the old three rows', /rows: [4-9]\d*,/.test(source), source.match(/rows: \d+,/)?.[0])
 check('串口操作 sits in the parameters band', at('串口操作') >= 0 && at('串口操作') < at('开始接收数据'), `op=${at('串口操作')}`)
 check(
 	'the four shared parameters are adjacent',
