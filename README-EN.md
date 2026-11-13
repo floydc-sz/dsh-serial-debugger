@@ -18,6 +18,8 @@ The plugin lives in the **right sidebar of the DeepSeek Harness main window**, a
 2. The right sidebar's guide page (its empty state) lists the tab types you can open, and one row is **「串口调试/Serial debugger」**;
 3. Click that row and the serial debugger opens in the right column (the tab is labelled 「串口调试/Serial debugger」).
 
+![The serial debugger panel](docs/screenshot.png)
+
 | Interface area | Functions |
 | --- | --- |
 | Parameters · first row | The **「串口选择/Port」** dropdown shows each device with its description (such as `COM3:USB-SERIAL CH340` on Windows systems, `/dev/ttyUSB0:FTDI` on Linux systems), and **「刷新/Refresh」** re-enumerates; when nothing enumerates it falls back to a free-text field. The right end of the same row holds **「语言/Language」** and **「帮助/Help」**. |
@@ -72,9 +74,15 @@ After installing, restart DeepSeek Harness or let Hot Module Replacement apply, 
 
   Without that, opening the port reports a clear message.
 
-- **DeepSeek Harness `^0.2.0-rc.1`** (see `dsh.engines.dsh` in `package.json`).
+- **DSH `>= 0.2.0-rc.1`** (see `dsh.engines.dsh` in `package.json`).
 
 ## Release Notes
+
+### 1.1.5 · 2026-11-13
+
+- The interface section gained a screenshot, so the panel in the right sidebar can be seen without installing it
+- The minimum DeepSeek Harness version is now 0.2.0-rc.1 and everything after it, where the declaration previously stopped at the 0.2.x line
+- The requirements line uses the DSH abbreviation; the rest of the text keeps the full name
 
 ### 1.1.3 · 2026-11-11
 

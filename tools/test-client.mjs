@@ -172,8 +172,13 @@ check('catalog: no official package sits in dependencies', manifest.dependencies
 // The range MUST carry a prerelease tag on the matching tuple, or node-semver
 // silently excludes every prerelease harness build.
 const dshRange = (manifest.dsh.engines && manifest.dsh.engines.dsh) || (manifest.engines && manifest.engines.dsh)
-check('catalog: the DSH host range is declared', typeof dshRange === 'string' && dshRange !== '', String(dshRange))
+check('catalog: the host range is declared', typeof dshRange === 'string' && dshRange !== '', String(dshRange))
 check('catalog: the host range reaches prerelease builds', typeof dshRange === 'string' && /0\.2\.0-[0-9A-Za-z.-]+/.test(dshRange), String(dshRange))
+// dshmarket splits a range on whitespace, so `>= 0.2.0-rc.1` becomes the tokens
+// `>=` and `0.2.0-rc.1`; the bare operator fails to parse and the whole range is
+// reported unknown, which its gate treats as an unmet requirement. `>=0.2.0-rc.1`
+// parses as one comparator and matches every later host line.
+check('catalog: the host range has no spaces', typeof dshRange === 'string' && !/\s/.test(dshRange), JSON.stringify(dshRange))
 check('catalog: npm publish access is public', manifest.publishConfig !== undefined && manifest.publishConfig.access === 'public', JSON.stringify(manifest.publishConfig))
 // The package now ships both bridges, so `os` must not exclude Linux. Leaving the
 // field out entirely is the widest declaration; listing both is equally correct.
